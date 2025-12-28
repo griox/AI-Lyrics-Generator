@@ -1,0 +1,8 @@
+fastapi==0.127.1
+uvicorn==0.39.0
+pydantic==2.12.5
+transformers==4.57.3
+torch==2.9.1
+huggingface-hub==0.36.0
+tokenizers==0.22.1
+safetensors==0.7.0
