@@ -1,0 +1,12 @@
+/* ...existing code... */
+.lyrics-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.lyrics-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #a5b4fc 0%, #f472b6 100%);
+  border-radius: 8px;
+}
+.lyrics-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+/* ...existing code... */
