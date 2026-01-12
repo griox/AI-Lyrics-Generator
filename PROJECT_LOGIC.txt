@@ -1,0 +1,91 @@
+Vietnamese Lyrics Generator – System Logic Overview
+=================================================
+
+1. Kien truc tong quan
+----------------------
+- Ung dung gom 3 phan chinh: frontend Next.js 13 (thu muc `frontend/`), backend FastAPI (thu muc `backend/`), va tap hop model GPT-2 fine-tune (thu muc `model/`).
+- Frontend thu thap lua chon the loai va doan bai hat, goi API `/generate` qua HTTP POST, hien thi loi bai hat quay ve.
+- Backend tai san GPT-2 tu thu muc `model/`, tao prompt tieng Viet tu dau vao, sinh chuoi moi bang tham so suy dien da dinh nghia, va tra JSON `{ "lyrics": ... }` cho client.
+
+2. Dong chay xu ly end-to-end
+-----------------------------
+(1) Nguoi dung truy cap trang chu `frontend/app/page.tsx`.
+(2) `LyricsForm` hien cac combobox (the loai, phan bai hat) nho `CustomCombobox` (lucide-react + shadcn UI).
+(3) Khi bam "Tao bai hat", `handleGenerate()` trong `page.tsx`:
+    - Set trang thai loading.
+    - Goi `fetch('http://127.0.0.1:8000/generate')` voi payload `SongConfig { genre, section }`.
+(4) FastAPI nhan request:
+    - Validate bang `LyricsRequest` (pydantic) gom `genre`, `section`.
+    - Lap prompt: "Viet phan {section} ... {genre} ... tieng viet".
+    - Tokenize prompt -> `input_ids` (PyTorch tensor).
+    - Goi `GPT2LMHeadModel.generate()` voi cac tham so: `max_length=200`, `no_repeat_ngram_size=2`, `do_sample=True`, `top_k=50`, `top_p=0.95`, `temperature=0.7`. Pad token dat theo `tokenizer.eos_token_id`.
+    - Giai ma output va tra JSON.
+    - Sleep 2s mo phong do tre AI.
+(5) Frontend nhan JSON, cap nhat state `lyrics`, tat loading, hien thi bang `LyricsDisplay` (Framer Motion fade-in).
+(6) Neu loi ket noi, trang hien thong diep fallback "Loi ket noi den server AI...".
+
+3. Backend chi tiet (`backend/main.py`)
+---------------------------------------
+- Khoi tao `FastAPI()` va them `CORSMiddleware` (allow *). Dieu nay cho phep frontend Next dev server (3000) goi API.
+- Model path co dinh `../model`, yeu cau tap tin HuggingFace (config.json, merges.txt, vocab.json, model.safetensors...).
+- Endpoint duy nhat `/generate` (POST) tra JSON. Loi bat va nem `HTTPException(500)` voi chi tiet goc.
+- Chay server bang `uvicorn main:app --reload` tu thu muc `backend/`.
+
+4. Thu muc model
+-----------------
+- Bao gom du lieu va checkpoint GPT-2 (added_tokens.json, tokenizer_config.json, special_tokens_map.json, etc.).
+- `lyrics_dataset_plain_text.json` khong duoc load luc runtime nhung la tai lieu training.
+- Python code gia su da fine-tune truoc va chi can load.
+
+5. Frontend chi tiet (`frontend/`)
+----------------------------------
+- Next.js 13 App Router, TypeScript, TailwindCSS + custom gradient theme.
+- Fonts tu `next/font` (Geist va Geist Mono) trong `app/layout.tsx` set `<html lang="vi">`.
+- `app/page.tsx` la client component, su dung `useState` de giu `config`, `lyrics`, `loading`. Animation su dung `framer-motion` (fade + translate cho container, button interactions, text fade-in).
+- API types:
+  - `SongConfig` (genre, section).
+  - `LyricsResponse` voi field `lyrics`.
+- Constants: `GENRES` (hien tai chi co `V-Pop`) va `SECTIONS` (Intro, Verse, Chorus, Bridge, Outro).
+
+6. Thanh phan UI
+-----------------
+- `Header`: tieu de gradient, mo ta ngan.
+- `LyricsForm`: chua 2 combobox va nut submit. Combobox su dung `CustomCombobox` (Popover + Command palette) de tim kiem option, icon `Music`, `Mic2` tu lucide-react. Nut su dung motion scale de tao cam giac interact.
+- `CustomCombobox` (DropDownButton.tsx): duoc xay dung tren cac component shadcn (`Button`, `Command`, `Popover`). Luu open state, goi `onChange` voi option duoc chon, dong Popover.
+- `LyricsDisplay`: o hien thi co trang thai (empty -> placeholder, loading -> bubble animation, co data -> motion fade-in). CSS su dung `whitespace-pre-wrap` de giu xuong dong tu backend.
+- Thu vien helper `cn()` (clsx + tailwind-merge) dung hop class.
+
+7. Trang thai va quan ly loi
+----------------------------
+- Loading: bo qua nut (disabled) va thong diep "Dang sang tac...". Lyrics display se hien animation.
+- Loi network: catched, log console, thong bao nguoi dung. Khong co retry tu dong.
+- Khong co form validation phuc tap vi options co han.
+
+8. Cach chay he thong
+----------------------
+Backend:
+- cd backend
+- tao virtual env (neu can), cai dat `pip install -r requirements.txt` (FastAPI, transformers, torch, uvicorn...).
+- `uvicorn main:app --reload`
+
+Frontend:
+- cd frontend
+- `npm install` (hoac `pnpm install` neu doi config)
+- `npm run dev`
+- Truy cap http://localhost:3000 va dam bao backend chay tai http://127.0.0.1:8000.
+
+9. Go y mo rong
+---------------
+- Bo sung them the loai, tham so prompt (cung cap truong emotion/topic).
+- Hien lich su ket qua hoac luu file.
+- Xu ly loi backend ro rang hon (HTTP status, thong tin timeout).
+- Them auth neu mo cong khai.
+
+10. Tu lieu ho tro AI viet bao cao
+---------------------------------
+Bao cao co the bao gom:
+- Phan kien truc (Frontend/Backend/Model) + so do luong du lieu o muc 2.
+- Giai thich thong so sinh chu, cai tien de tranh lap tu.
+- Danh gia trai nghiem nguoi dung (UI gradient, animation, trang thai, thong diep loi).
+- De xuat mo rong (muc 9) lam phan de xuat.
+- Trinh bay quy trinh trien khai (muc 8) lam phan huong dan.
